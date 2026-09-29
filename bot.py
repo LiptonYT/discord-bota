@@ -791,107 +791,44 @@ async def change_rank(
     # Сначала выдаём новое звание
     # --------------------------------------------------------
 
-    roles_to_add = [
-        role
-        for role in new_roles
-        if role not in member.roles
-    ]
+    # Оставляем только те роли, которые бот реально может выдать
+roles_to_add = [
+    role
+    for role in roles
+    if role < bot_member.top_role
+    and role not in member.roles
+]
 
-    if roles_to_add:
+# Роли, которые бот не может выдать
+impossible_roles = [
+    role
+    for role in roles
+    if role >= bot_member.top_role
+]
 
-        try:
+if not roles_to_add:
+    await interaction.response.send_message(
+        "❌ Бот не может выдать ни одну роль "
+        "из выбранного звания.\n\n"
+        "Подними главную роль бота выше ролей ГИБДД.",
+        ephemeral=True
+    )
+    return
 
-            await member.add_roles(
-                *roles_to_add,
-                reason=(
-                    f"Смена звания: "
-                    f"{current_rank} → {new_rank}"
-                )
-            )
-
-        except discord.Forbidden:
-
-            raise RuntimeError(
-                "Не удалось выдать новое звание.\n\n"
-                "Старые роли не были сняты."
-            )
-
-    member = await refresh_member(
-        guild,
-        member
+try:
+    await member.add_roles(
+        *roles_to_add,
+        reason=f"Заявка ГИБДД одобрена | Звание: {rank}"
     )
 
-    current_role_ids = {
-        role.id
-        for role in member.roles
-    }
-
-    missing = [
-        role
-        for role in new_roles
-        if role.id not in current_role_ids
-    ]
-
-    if missing:
-
-        raise RuntimeError(
-            "Не все роли нового звания выдались:\n\n"
-            + "\n".join(
-                f"• {role.name} (`{role.id}`)"
-                for role in missing
-            )
-            + "\n\n"
-            "Старые роли не сняты."
-        )
-
-    # --------------------------------------------------------
-    # Снимаем ВСЕ старые роли званий
-    # --------------------------------------------------------
-
-    new_role_ids = {
-        role.id
-        for role in new_roles
-    }
-
-    roles_to_remove = [
-        role
-        for role in member.roles
-        if (
-            role.id in all_rank_role_ids
-            and role.id not in new_role_ids
-            and role.id not in department_ids
-        )
-    ]
-
-    if roles_to_remove:
-
-        check_bot_can_manage_roles(
-            guild,
-            roles_to_remove
-        )
-
-        try:
-
-            await member.remove_roles(
-                *roles_to_remove,
-                reason=(
-                    f"Снятие старых ролей звания: "
-                    f"{current_rank} → {new_rank}"
-                )
-            )
-
-        except discord.Forbidden:
-
-            raise RuntimeError(
-                "Новое звание выдано, "
-                "но старые роли снять не удалось.\n\n"
-                "Проверь иерархию ролей бота."
-            )
-
-    return await refresh_member(
-        guild,
-        member
+except discord.Forbidden:
+    await interaction.response.send_message(
+        "❌ Discord запретил выдачу ролей.\n\n"
+        "Проверь право **Управление ролями** "
+        "и положение роли бота.",
+        ephemeral=True
     )
+    return
 
 
 # ============================================================
