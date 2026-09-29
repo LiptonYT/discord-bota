@@ -1,46 +1,36 @@
 import os
+from datetime import datetime, timezone
+
 import discord
 from discord.ext import commands
 from discord import app_commands
-from datetime import datetime
 
 
 # ============================================================
-#                         НАСТРОЙКИ
+# НАСТРОЙКИ
 # ============================================================
 
-# Для хостинга:
-# Создай переменную окружения DISCORD_TOKEN
-# и вставь туда НОВЫЙ токен бота.
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 if not TOKEN:
     raise RuntimeError(
-        "❌ Переменная DISCORD_TOKEN не задана. "
-        "Добавь её в настройках хостинга."
+        "DISCORD_TOKEN не задан. "
+        "Добавь переменную DISCORD_TOKEN в настройках хостинга."
     )
 
-
 GUILD_ID = 1533075462383730838
-
 KADRO_PANEL_CHANNEL_ID = 1533076140552491018
 KADRO_LOG_CHANNEL_ID = 1533076137209495642
 
-# Роль старшего состава
 SENIOR_ROLE_ID = 1533075692785504327
 
-# Роль "Уволен"
 FIRED_ROLE_ID = 1533075835097976893
-
-# Роль "Гражданин"
 CITIZEN_ROLE_ID = 1533075845663690842
-
-# Роль "Чёрный список"
 BLACKLIST_ROLE_ID = 1533075833856458972
 
 
 # ============================================================
-#                         ЗВАНИЯ
+# ЗВАНИЯ
 # ============================================================
 
 RANKS = {
@@ -141,8 +131,8 @@ RANKS = {
         1533075786175746108,
         1533075784858865704,
         1533075745751175299,
-        1533075739631550494,
         1533075731054071959,
+        1533075739631550494,
         1533075702432403456,
     ],
 
@@ -151,8 +141,8 @@ RANKS = {
         1533075786175746108,
         1533075784858865704,
         1533075745751175299,
-        1533075739631550494,
         1533075731054071959,
+        1533075739631550494,
         1533075702432403456,
     ],
 
@@ -250,7 +240,7 @@ RANKS = {
 
 
 # ============================================================
-#                         ОТДЕЛЫ
+# ОТДЕЛЫ
 # ============================================================
 
 DEPARTMENT_ROLES = {
@@ -287,7 +277,7 @@ DEPARTMENT_ROLES = {
 
 
 # ============================================================
-#                    СТАТУСЫ УВОЛЬНЕНИЯ
+# СТАТУСЫ
 # ============================================================
 
 DISMISS_STATUSES = {
@@ -304,12 +294,12 @@ DISMISS_STATUSES = {
 
 
 # ============================================================
-#                         INTENTS
+# BOT
 # ============================================================
 
 intents = discord.Intents.default()
-intents.members = True
 intents.guilds = True
+intents.members = True
 
 bot = commands.Bot(
     command_prefix="!",
@@ -318,10 +308,12 @@ bot = commands.Bot(
 
 
 # ============================================================
-#                    ПРОВЕРКА ДОСТУПА
+# ДОСТУП
 # ============================================================
 
-def has_senior_access(member: discord.Member) -> bool:
+def has_senior_access(
+    member: discord.Member
+) -> bool:
 
     if member.guild_permissions.administrator:
         return True
@@ -333,7 +325,7 @@ def has_senior_access(member: discord.Member) -> bool:
 
 
 # ============================================================
-#                     ВСПОМОГАТЕЛЬНЫЕ
+# ОБНОВЛЕНИЕ УЧАСТНИКА
 # ============================================================
 
 async def refresh_member(
@@ -342,10 +334,20 @@ async def refresh_member(
 ) -> discord.Member:
 
     try:
-        return await guild.fetch_member(member.id)
-    except Exception:
+        return await guild.fetch_member(
+            member.id
+        )
+
+    except (
+        discord.HTTPException,
+        discord.NotFound
+    ):
         return member
 
+
+# ============================================================
+# ID РОЛЕЙ
+# ============================================================
 
 def get_all_rank_ids():
 
@@ -354,7 +356,9 @@ def get_all_rank_ids():
     for role_ids in RANKS.values():
 
         for role_id in role_ids:
-            result.add(int(role_id))
+            result.add(
+                int(role_id)
+            )
 
     return result
 
@@ -366,7 +370,9 @@ def get_all_department_ids():
     for role_ids in DEPARTMENT_ROLES.values():
 
         for role_id in role_ids:
-            result.add(int(role_id))
+            result.add(
+                int(role_id)
+            )
 
     return result
 
@@ -387,6 +393,10 @@ def get_all_status_ids():
     return result
 
 
+# ============================================================
+# РОЛИ
+# ============================================================
+
 def resolve_roles(
     guild: discord.Guild,
     role_ids
@@ -401,10 +411,12 @@ def resolve_roles(
         if role_id == 0:
 
             raise RuntimeError(
-                "В настройках не указан ID одной из ролей."
+                "Указан пустой ID роли."
             )
 
-        role = guild.get_role(role_id)
+        role = guild.get_role(
+            role_id
+        )
 
         if role is None:
 
@@ -421,7 +433,7 @@ def resolve_roles(
 
 
 # ============================================================
-#                ПРОВЕРКА ИЕРАРХИИ БОТА
+# ИЕРАРХИЯ БОТА
 # ============================================================
 
 def check_bot_can_manage_roles(
@@ -434,7 +446,7 @@ def check_bot_can_manage_roles(
     if bot_member is None:
 
         raise RuntimeError(
-            "Не удалось получить данные о боте."
+            "Не удалось определить роль бота."
         )
 
     for role in roles:
@@ -450,25 +462,26 @@ def check_bot_can_manage_roles(
             raise RuntimeError(
                 f"Бот не может управлять ролью "
                 f"**{role.name}** (`{role.id}`).\n\n"
-                f"Подними главную роль бота выше этой роли."
+                "Подними главную роль бота выше этой роли."
             )
 
         if not role.is_assignable():
 
             raise RuntimeError(
-                f"Роль **{role.name}** (`{role.id}`) "
-                f"нельзя выдать или снять ботом."
+                f"Роль **{role.name}** нельзя выдать или снять ботом."
             )
 
 
 # ============================================================
-#                  ОПРЕДЕЛЕНИЕ ЗВАНИЯ
+# ОПРЕДЕЛЕНИЕ ЗВАНИЯ
 # ============================================================
 
-def get_actual_rank(member: discord.Member):
+def get_actual_rank(
+    member: discord.Member
+):
 
     member_role_ids = {
-        role.id
+        int(role.id)
         for role in member.roles
     }
 
@@ -492,71 +505,71 @@ def get_actual_rank(member: discord.Member):
     if not found_ranks:
         return None
 
-    # Если несколько ролей обнаружены,
-    # берём самое старшее звание по порядку RANKS.
-    rank_order = list(RANKS.keys())
+    rank_order = list(
+        RANKS.keys()
+    )
 
     return max(
         found_ranks,
-        key=lambda rank: rank_order.index(rank)
+        key=rank_order.index
     )
 
 
 # ============================================================
-#                  ОПРЕДЕЛЕНИЕ ОТДЕЛА
+# ПРОВЕРКА ЗВАНИЯ
 # ============================================================
 
-def get_actual_department(member: discord.Member):
+def validate_current_rank(
+    member: discord.Member,
+    selected_rank: str
+):
+
+    if selected_rank not in RANKS:
+
+        raise RuntimeError(
+            f"Звание `{selected_rank}` не найдено."
+        )
 
     member_role_ids = {
-        role.id
+        int(role.id)
         for role in member.roles
     }
 
-    role_to_departments = {}
+    primary_role_id = int(
+        RANKS[selected_rank][0]
+    )
 
-    for department_name, role_ids in DEPARTMENT_ROLES.items():
+    if primary_role_id not in member_role_ids:
 
-        for role_id in role_ids:
-
-            role_id = int(role_id)
-
-            role_to_departments.setdefault(
-                role_id,
-                set()
-            ).add(
-                department_name
-            )
-
-    possible_departments = set()
-
-    for role_id in member_role_ids:
-
-        departments = role_to_departments.get(
-            role_id,
-            set()
+        actual_rank = get_actual_rank(
+            member
         )
 
-        if len(departments) == 1:
+        if actual_rank is None:
+            actual_rank = "не определено"
 
-            possible_departments.update(
-                departments
-            )
-
-    if len(possible_departments) == 1:
-
-        return next(
-            iter(possible_departments)
+        raise RuntimeError(
+            f"❌ У сотрудника другое звание.\n\n"
+            f"Вы выбрали: **{selected_rank}**\n"
+            f"Фактически: **{actual_rank}**\n\n"
+            "⚠️ Роли сотрудника не изменены."
         )
 
-    if len(possible_departments) > 1:
+    return True
 
-        return {
-            "error": "multiple",
-            "departments": sorted(
-                possible_departments
-            )
-        }
+
+# ============================================================
+# ОПРЕДЕЛЕНИЕ ОТДЕЛА
+# ============================================================
+
+def get_actual_department(
+    member: discord.Member
+):
+
+    member_role_ids = {
+        int(role.id)
+        for role in member.roles
+    }
 
     full_matches = []
 
@@ -576,57 +589,91 @@ def get_actual_department(member: discord.Member):
             )
 
     if len(full_matches) == 1:
-
         return full_matches[0]
 
     if len(full_matches) > 1:
+
+        for department_name in full_matches:
+
+            role_ids = {
+                int(role_id)
+                for role_id in DEPARTMENT_ROLES[
+                    department_name
+                ]
+            }
+
+            other_ids = set()
+
+            for other_department in full_matches:
+
+                if other_department == department_name:
+                    continue
+
+                other_ids.update(
+                    int(role_id)
+                    for role_id in DEPARTMENT_ROLES[
+                        other_department
+                    ]
+                )
+
+            unique_ids = (
+                role_ids - other_ids
+            )
+
+            if unique_ids & member_role_ids:
+                return department_name
 
         return {
             "error": "multiple",
             "departments": full_matches
         }
 
+    # Дополнительная проверка уникальных ролей
+    candidates = []
+
+    for department_name, role_ids in DEPARTMENT_ROLES.items():
+
+        department_ids = {
+            int(role_id)
+            for role_id in role_ids
+        }
+
+        other_ids = set()
+
+        for other_department, other_role_ids in DEPARTMENT_ROLES.items():
+
+            if other_department == department_name:
+                continue
+
+            other_ids.update(
+                int(role_id)
+                for role_id in other_role_ids
+            )
+
+        unique_ids = (
+            department_ids - other_ids
+        )
+
+        if unique_ids & member_role_ids:
+            candidates.append(
+                department_name
+            )
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    if len(candidates) > 1:
+
+        return {
+            "error": "multiple",
+            "departments": candidates
+        }
+
     return None
 
 
 # ============================================================
-#                  ПРОВЕРКА ЗВАНИЯ
-# ============================================================
-
-def validate_current_rank(
-    member: discord.Member,
-    selected_rank: str
-):
-
-    if selected_rank not in RANKS:
-
-        raise RuntimeError(
-            f"Звание `{selected_rank}` не найдено."
-        )
-
-    member_role_ids = {
-        int(role.id)
-        for role in member.roles
-    }
-
-    selected_rank_role_id = int(
-        RANKS[selected_rank][0]
-    )
-
-    if selected_rank_role_id not in member_role_ids:
-
-        raise RuntimeError(
-            f"❌ У сотрудника **{member.display_name}** "
-            f"нет основной роли выбранного звания.\n\n"
-            f"Вы выбрали: **{selected_rank}**\n\n"
-            f"⚠️ Роли сотрудника не изменены."
-        )
-
-    return True
-
-
-# ============================================================
-#                  ПРОВЕРКА ОТДЕЛА
+# ПРОВЕРКА ОТДЕЛА
 # ============================================================
 
 def validate_current_department(
@@ -641,103 +688,45 @@ def validate_current_department(
     if actual_department is None:
 
         raise RuntimeError(
-            f"❌ Не удалось определить настоящий отдел "
-            f"**{member.display_name}**.\n\n"
+            "❌ Не удалось определить отдел сотрудника.\n\n"
             f"Вы выбрали: **{selected_department}**\n\n"
-            f"⚠️ Роли сотрудника не изменены."
+            "⚠️ Роли сотрудника не изменены."
         )
 
-    if isinstance(actual_department, dict):
+    if isinstance(
+        actual_department,
+        dict
+    ):
 
-        departments = ", ".join(
-            actual_department["departments"]
+        if selected_department in actual_department["departments"]:
+            return True
+
+        raise RuntimeError(
+            "❌ Выбранный отдел не соответствует ролям сотрудника.\n\n"
+            f"Вы выбрали: **{selected_department}**\n"
+            f"Найдено: **{', '.join(actual_department['departments'])}**\n\n"
+            "⚠️ Роли сотрудника не изменены."
         )
-
-        # Берём первое найденное отделение,
-        # чтобы не блокировать кадровое действие.
-        if selected_department not in actual_department["departments"]:
-
-            raise RuntimeError(
-                "❌ Выбранный отдел не соответствует ролям сотрудника.\n\n"
-                f"Вы выбрали: **{selected_department}**\n"
-                f"Найдены признаки: **{departments}**\n\n"
-                "⚠️ Роли сотрудника не изменены."
-            )
-
-        return True
 
     if actual_department != selected_department:
 
         raise RuntimeError(
-            f"❌ У сотрудника **{member.display_name}** "
-            f"не тот отдел.\n\n"
+            f"❌ У сотрудника другой отдел.\n\n"
             f"Вы выбрали: **{selected_department}**\n"
             f"Фактически: **{actual_department}**\n\n"
-            f"⚠️ Роли сотрудника не изменены."
+            "⚠️ Роли сотрудника не изменены."
         )
 
     return True
 
 
 # ============================================================
-#              СНЯТИЕ ВСЕХ РОЛЕЙ ОТДЕЛА
-# ============================================================
-
-async def remove_all_department_roles(
-    member: discord.Member,
-    preserve_role_ids=None
-):
-
-    guild = member.guild
-
-    if preserve_role_ids is None:
-        preserve_role_ids = set()
-
-    preserve_role_ids = {
-        int(role_id)
-        for role_id in preserve_role_ids
-    }
-
-    all_department_roles = resolve_roles(
-        guild,
-        get_all_department_ids()
-    )
-
-    roles_to_remove = [
-        role
-        for role in all_department_roles
-        if role in member.roles
-        and role.id not in preserve_role_ids
-    ]
-
-    if not roles_to_remove:
-        return
-
-    check_bot_can_manage_roles(
-        guild,
-        roles_to_remove
-    )
-
-    try:
-
-        await member.remove_roles(
-            *roles_to_remove,
-            reason=(
-                "Снятие ролей отдела "
-                "при кадровом изменении"
-            )
-        )
-
-    except discord.Forbidden:
-
-        raise RuntimeError(
-            "Не удалось снять роли отдела.\n\n"
-            "Проверь иерархию ролей бота."
-        )
-
-
-# ============================================================
-#                    СМЕНА ЗВАНИЯ
+# СМЕНА ЗВАНИЯ
+#
+# НОВОЕ ЗВАНИЕ:
+#   + выдаём ТОЛЬКО роли звания
+#   - забираем старые роли звания
+#   = роли отдела НЕ ТРОГАЕМ
 # ============================================================
 
 async def change_rank(
@@ -766,21 +755,51 @@ async def change_rank(
             "Текущее и новое звание совпадают."
         )
 
-    new_roles = resolve_roles(
+    member = await refresh_member(
         guild,
-        RANKS[new_rank]
+        member
     )
 
-    all_rank_role_ids = set()
+    # --------------------------------------------------------
+    # ВСЕ РОЛИ ОТДЕЛОВ
+    # --------------------------------------------------------
 
-    for role_ids in RANKS.values():
+    department_role_ids = get_all_department_ids()
 
-        for role_id in role_ids:
-            all_rank_role_ids.add(
-                int(role_id)
-            )
+    # --------------------------------------------------------
+    # РОЛИ НОВОГО ЗВАНИЯ
+    #
+    # ВАЖНО:
+    # Всё, что является ролью отдела,
+    # здесь исключается.
+    # --------------------------------------------------------
 
-    department_ids = get_all_department_ids()
+    configured_new_rank_ids = {
+        int(role_id)
+        for role_id in RANKS[new_rank]
+    }
+
+    new_rank_ids = {
+        role_id
+        for role_id in configured_new_rank_ids
+        if role_id not in department_role_ids
+    }
+
+    if not new_rank_ids:
+
+        raise RuntimeError(
+            f"Для звания **{new_rank}** "
+            "не найдены отдельные роли звания."
+        )
+
+    new_roles = resolve_roles(
+        guild,
+        new_rank_ids
+    )
+
+    # --------------------------------------------------------
+    # ПРОВЕРЯЕМ НОВЫЕ РОЛИ
+    # --------------------------------------------------------
 
     check_bot_can_manage_roles(
         guild,
@@ -788,51 +807,108 @@ async def change_rank(
     )
 
     # --------------------------------------------------------
-    # Сначала выдаём новое звание
+    # ВЫДАЁМ НОВЫЕ РОЛИ
     # --------------------------------------------------------
 
-    # Оставляем только те роли, которые бот реально может выдать
-roles_to_add = [
-    role
-    for role in roles
-    if role < bot_member.top_role
-    and role not in member.roles
-]
+    roles_to_add = [
+        role
+        for role in new_roles
+        if role not in member.roles
+    ]
 
-# Роли, которые бот не может выдать
-impossible_roles = [
-    role
-    for role in roles
-    if role >= bot_member.top_role
-]
+    if roles_to_add:
 
-if not roles_to_add:
-    await interaction.response.send_message(
-        "❌ Бот не может выдать ни одну роль "
-        "из выбранного звания.\n\n"
-        "Подними главную роль бота выше ролей ГИБДД.",
-        ephemeral=True
+        try:
+
+            await member.add_roles(
+                *roles_to_add,
+                reason=(
+                    f"Повышение/понижение звания: "
+                    f"{current_rank} → {new_rank}"
+                )
+            )
+
+        except discord.Forbidden:
+
+            raise RuntimeError(
+                "Не удалось выдать новые роли звания.\n\n"
+                "Проверь иерархию ролей бота."
+            )
+
+    member = await refresh_member(
+        guild,
+        member
     )
-    return
 
-try:
-    await member.add_roles(
-        *roles_to_add,
-        reason=f"Заявка ГИБДД одобрена | Звание: {rank}"
-    )
+    # --------------------------------------------------------
+    # ВСЕ РОЛИ, КОТОРЫЕ ИСПОЛЬЗУЮТСЯ В RANKS
+    # --------------------------------------------------------
 
-except discord.Forbidden:
-    await interaction.response.send_message(
-        "❌ Discord запретил выдачу ролей.\n\n"
-        "Проверь право **Управление ролями** "
-        "и положение роли бота.",
-        ephemeral=True
+    all_rank_role_ids = get_all_rank_ids()
+
+    # --------------------------------------------------------
+    # СТАРЫЕ РОЛИ ЗВАНИЯ
+    #
+    # РОЛИ ОТДЕЛОВ ИСКЛЮЧАЕМ
+    # --------------------------------------------------------
+
+    roles_to_remove = [
+        role
+        for role in member.roles
+        if (
+            int(role.id) in all_rank_role_ids
+            and int(role.id) not in new_rank_ids
+            and int(role.id) not in department_role_ids
+        )
+    ]
+
+    roles_to_remove = list({
+        role.id: role
+        for role in roles_to_remove
+    }.values())
+
+    if roles_to_remove:
+
+        check_bot_can_manage_roles(
+            guild,
+            roles_to_remove
+        )
+
+        try:
+
+            await member.remove_roles(
+                *roles_to_remove,
+                reason=(
+                    f"Снятие старых ролей звания: "
+                    f"{current_rank} → {new_rank}"
+                )
+            )
+
+        except discord.Forbidden:
+
+            raise RuntimeError(
+                "Новое звание выдано, "
+                "но старые роли снять не удалось.\n\n"
+                "Проверь иерархию ролей бота."
+            )
+
+    return await refresh_member(
+        guild,
+        member
     )
-    return
 
 
 # ============================================================
-#                    ПЕРЕВОД ОТДЕЛА
+# ПЕРЕВОД ОТДЕЛА
+#
+# СТАРЫЙ ОТДЕЛ:
+#   - снимаем
+#
+# НОВЫЙ ОТДЕЛ:
+#   + выдаём
+#
+# ЗВАНИЕ:
+#   не меняем
 # ============================================================
 
 async def change_department(
@@ -876,6 +952,10 @@ async def change_department(
         old_roles + new_roles
     )
 
+    # --------------------------------------------------------
+    # ВЫДАЁМ НОВЫЙ ОТДЕЛ
+    # --------------------------------------------------------
+
     roles_to_add = [
         role
         for role in new_roles
@@ -899,7 +979,7 @@ async def change_department(
 
             raise RuntimeError(
                 "Не удалось выдать роли нового отдела.\n\n"
-                "Старые роли не были сняты."
+                "Проверь иерархию ролей бота."
             )
 
     member = await refresh_member(
@@ -907,49 +987,39 @@ async def change_department(
         member
     )
 
-    current_role_ids = {
-        role.id
-        for role in member.roles
-    }
-
-    missing_roles = [
-        role
-        for role in new_roles
-        if role.id not in current_role_ids
-    ]
-
-    if missing_roles:
-
-        raise RuntimeError(
-            "Не все роли нового отдела были выданы:\n\n"
-            + "\n".join(
-                f"• {role.name} (`{role.id}`)"
-                for role in missing_roles
-            )
-            + "\n\n"
-            "Старые роли отдела не были сняты."
-        )
+    # --------------------------------------------------------
+    # СНИМАЕМ СТАРЫЙ ОТДЕЛ
+    #
+    # Общие роли двух отделов оставляем.
+    # --------------------------------------------------------
 
     new_role_ids = {
-        role.id
+        int(role.id)
         for role in new_roles
     }
 
     roles_to_remove = [
         role
         for role in old_roles
-        if role.id not in new_role_ids
-        and role in member.roles
+        if (
+            role in member.roles
+            and int(role.id) not in new_role_ids
+        )
     ]
 
     if roles_to_remove:
+
+        check_bot_can_manage_roles(
+            guild,
+            roles_to_remove
+        )
 
         try:
 
             await member.remove_roles(
                 *roles_to_remove,
                 reason=(
-                    f"Перевод: "
+                    f"Снятие отдела: "
                     f"{current_department} → "
                     f"{new_department}"
                 )
@@ -958,9 +1028,8 @@ async def change_department(
         except discord.Forbidden:
 
             raise RuntimeError(
-                "Новые роли выданы, "
-                "но роли старого отдела снять не удалось.\n\n"
-                "Проверь иерархию ролей."
+                "Новый отдел выдан, "
+                "но старый отдел снять не удалось."
             )
 
     return await refresh_member(
@@ -970,7 +1039,7 @@ async def change_department(
 
 
 # ============================================================
-#                 ПРИМЕНЕНИЕ СТАТУСА
+# УВОЛЬНЕНИЕ — СТАТУС
 # ============================================================
 
 async def apply_dismiss_status(
@@ -1002,15 +1071,17 @@ async def apply_dismiss_status(
     )
 
     target_ids = {
-        role.id
+        int(role.id)
         for role in target_roles
     }
 
     roles_to_remove = [
         role
         for role in all_status_roles
-        if role in member.roles
-        and role.id not in target_ids
+        if (
+            role in member.roles
+            and int(role.id) not in target_ids
+        )
     ]
 
     if roles_to_remove:
@@ -1019,7 +1090,7 @@ async def apply_dismiss_status(
 
             await member.remove_roles(
                 *roles_to_remove,
-                reason="Обновление статуса после увольнения"
+                reason="Удаление старого статуса"
             )
 
         except discord.Forbidden:
@@ -1052,37 +1123,14 @@ async def apply_dismiss_status(
                 f"Не удалось выдать статус `{status_name}`."
             )
 
-    member = await refresh_member(
+    return await refresh_member(
         guild,
         member
     )
 
-    current_role_ids = {
-        role.id
-        for role in member.roles
-    }
-
-    missing = [
-        role
-        for role in target_roles
-        if role.id not in current_role_ids
-    ]
-
-    if missing:
-
-        raise RuntimeError(
-            "Не все итоговые роли были выданы:\n\n"
-            + "\n".join(
-                f"• {role.name} (`{role.id}`)"
-                for role in missing
-            )
-        )
-
-    return member
-
 
 # ============================================================
-#                         УВОЛЬНЕНИЕ
+# УВОЛЬНЕНИЕ
 # ============================================================
 
 async def dismiss_member(
@@ -1118,12 +1166,12 @@ async def dismiss_member(
         if role in member.roles
     ]
 
-    check_bot_can_manage_roles(
-        guild,
-        roles_to_remove
-    )
-
     if roles_to_remove:
+
+        check_bot_can_manage_roles(
+            guild,
+            roles_to_remove
+        )
 
         try:
 
@@ -1154,7 +1202,7 @@ async def dismiss_member(
 
 
 # ============================================================
-#                           ЛОГ
+# ЛОГ
 # ============================================================
 
 async def send_log(
@@ -1182,10 +1230,10 @@ async def send_log(
                 KADRO_LOG_CHANNEL_ID
             )
 
-        except Exception:
+        except Exception as error:
 
             print(
-                "⚠️ Канал логов не найден."
+                f"⚠️ Канал логов не найден: {error}"
             )
 
             return
@@ -1197,7 +1245,9 @@ async def send_log(
             193,
             7
         ),
-        timestamp=datetime.now()
+        timestamp=datetime.now(
+            timezone.utc
+        )
     )
 
     embed.add_field(
@@ -1265,7 +1315,7 @@ async def send_log(
 
         embed.add_field(
             name="📝 Причина",
-            value=reason,
+            value=str(reason)[:1024],
             inline=False
         )
 
@@ -1273,13 +1323,21 @@ async def send_log(
         text="Аудит Lipton ГИБДД"
     )
 
-    await channel.send(
-        embed=embed
-    )
+    try:
+
+        await channel.send(
+            embed=embed
+        )
+
+    except Exception as error:
+
+        print(
+            f"⚠️ Ошибка отправки лога: {error}"
+        )
 
 
 # ============================================================
-#                    ОСНОВНАЯ ПАНЕЛЬ В ЧАТЕ
+# ГЛАВНАЯ ПАНЕЛЬ
 # ============================================================
 
 def main_embed():
@@ -1290,26 +1348,25 @@ def main_embed():
             "## 📋 Кадровая система\n\n"
 
             "📈 **Повышение**\n"
-            "Повышение сотрудника на новое звание.\n\n"
+            "Выдача ролей нового звания и снятие "
+            "старых ролей звания.\n\n"
 
             "📉 **Понижение**\n"
-            "Понижение сотрудника на новое звание.\n\n"
+            "Выдача ролей нового звания и снятие "
+            "старых ролей звания.\n\n"
 
             "🔄 **Перевод**\n"
-            "Перевод сотрудника в другой отдел.\n\n"
+            "Снятие старого отдела и выдача нового.\n\n"
 
             "🚫 **Увольнение**\n"
-            "Увольнение сотрудника с выбором статуса.\n\n"
+            "Снятие кадровых ролей и выдача статуса.\n\n"
 
             "━━━━━━━━━━━━━━━━━━━━━━\n"
 
-            "🔐 Доступ: **роль старшего состава**\n\n"
+            "🏢 При повышении и понижении "
+            "**роли отдела сохраняются**.\n\n"
 
-            "⚙️ Перед каждым действием бот проверяет "
-            "реальные роли сотрудника.\n\n"
-
-            "💻 После нажатия кнопки открывается "
-            "**всплывающее окно Discord**."
+            "🔐 Доступ: **роль старшего состава**"
         ),
         color=discord.Color.from_rgb(
             30,
@@ -1326,7 +1383,7 @@ def main_embed():
 
 
 # ============================================================
-#                  OPTIONS ДЛЯ SELECT
+# OPTIONS
 # ============================================================
 
 def rank_options(
@@ -1358,10 +1415,12 @@ def department_options(
 
 
 # ============================================================
-#                  POPUP — КАДРОВЫЙ АУДИТ
+# POPUP
 # ============================================================
 
-class KadroModal(discord.ui.Modal):
+class KadroModal(
+    discord.ui.Modal
+):
 
     def __init__(
         self,
@@ -1370,24 +1429,24 @@ class KadroModal(discord.ui.Modal):
 
         self.action = action
 
-        title = {
+        title_map = {
             "promote": "📈 Повышение сотрудника",
             "demote": "📉 Понижение сотрудника",
             "transfer": "🔄 Перевод сотрудника",
             "dismiss": "🚫 Увольнение сотрудника",
-        }[action]
+        }
 
         super().__init__(
-            title=title,
+            title=title_map[action],
             timeout=300
         )
 
-        # ====================================================
-        # Сотрудник
-        # ====================================================
+        # ----------------------------------------------------
+        # СОТРУДНИК
+        # ----------------------------------------------------
 
         self.employee_select = discord.ui.UserSelect(
-            custom_id="kadro_employee",
+            custom_id=f"kadro_{action}_employee",
             placeholder="Выберите сотрудника...",
             min_values=1,
             max_values=1,
@@ -1402,12 +1461,12 @@ class KadroModal(discord.ui.Modal):
             )
         )
 
-        # ====================================================
-        # Текущее звание
-        # ====================================================
+        # ----------------------------------------------------
+        # ТЕКУЩЕЕ ЗВАНИЕ
+        # ----------------------------------------------------
 
         self.current_rank_select = discord.ui.Select(
-            custom_id="kadro_current_rank",
+            custom_id=f"kadro_{action}_current_rank",
             placeholder="Выберите текущее звание...",
             options=rank_options(),
             min_values=1,
@@ -1423,9 +1482,11 @@ class KadroModal(discord.ui.Modal):
             )
         )
 
-        # ====================================================
-        # Новое звание
-        # ====================================================
+        # ----------------------------------------------------
+        # НОВОЕ ЗВАНИЕ
+        # ----------------------------------------------------
+
+        self.new_rank_select = None
 
         if action in (
             "promote",
@@ -1433,7 +1494,7 @@ class KadroModal(discord.ui.Modal):
         ):
 
             self.new_rank_select = discord.ui.Select(
-                custom_id="kadro_new_rank",
+                custom_id=f"kadro_{action}_new_rank",
                 placeholder="Выберите новое звание...",
                 options=rank_options(),
                 min_values=1,
@@ -1444,18 +1505,16 @@ class KadroModal(discord.ui.Modal):
             self.add_item(
                 discord.ui.Label(
                     text="🎯 Новое звание",
-                    description="Звание после кадрового действия",
+                    description="Звание после действия",
                     component=self.new_rank_select
                 )
             )
 
-        else:
+        # ----------------------------------------------------
+        # ТЕКУЩИЙ ОТДЕЛ
+        # ----------------------------------------------------
 
-            self.new_rank_select = None
-
-        # ====================================================
-        # Текущий отдел
-        # ====================================================
+        self.current_department_select = None
 
         if action in (
             "transfer",
@@ -1463,7 +1522,7 @@ class KadroModal(discord.ui.Modal):
         ):
 
             self.current_department_select = discord.ui.Select(
-                custom_id="kadro_current_department",
+                custom_id=f"kadro_{action}_current_department",
                 placeholder="Выберите текущий отдел...",
                 options=department_options(),
                 min_values=1,
@@ -1479,18 +1538,16 @@ class KadroModal(discord.ui.Modal):
                 )
             )
 
-        else:
+        # ----------------------------------------------------
+        # НОВЫЙ ОТДЕЛ
+        # ----------------------------------------------------
 
-            self.current_department_select = None
-
-        # ====================================================
-        # Новый отдел
-        # ====================================================
+        self.new_department_select = None
 
         if action == "transfer":
 
             self.new_department_select = discord.ui.Select(
-                custom_id="kadro_new_department",
+                custom_id="kadro_transfer_new_department",
                 placeholder="Выберите новый отдел...",
                 options=department_options(),
                 min_values=1,
@@ -1503,16 +1560,14 @@ class KadroModal(discord.ui.Modal):
                     text="🏢 Новый отдел",
                     description="Отдел после перевода",
                     component=self.new_department_select
-                )
+            )
             )
 
-        else:
+        # ----------------------------------------------------
+        # СТАТУС
+        # ----------------------------------------------------
 
-            self.new_department_select = None
-
-        # ====================================================
-        # Статус увольнения
-        # ====================================================
+        self.dismiss_status_select = None
 
         if action == "dismiss":
 
@@ -1526,12 +1581,13 @@ class KadroModal(discord.ui.Modal):
                         description="Гражданин + Уволен",
                         emoji="🚫"
                     ),
+
                     discord.SelectOption(
                         label="Чёрный список",
                         value="Чёрный список",
                         description="Гражданин + Чёрный список",
                         emoji="⛔"
-                    ),
+                    )
                 ],
                 min_values=1,
                 max_values=1,
@@ -1541,21 +1597,17 @@ class KadroModal(discord.ui.Modal):
             self.add_item(
                 discord.ui.Label(
                     text="📌 Итоговый статус",
-                    description="После увольнения выдаётся Гражданин",
+                    description="Статус после увольнения",
                     component=self.dismiss_status_select
                 )
             )
 
-        else:
-
-            self.dismiss_status_select = None
-
-        # ====================================================
-        # Причина
-        # ====================================================
+        # ----------------------------------------------------
+        # ПРИЧИНА
+        # ----------------------------------------------------
 
         self.reason_input = discord.ui.TextInput(
-            custom_id="kadro_reason",
+            custom_id=f"kadro_{action}_reason",
             placeholder="Введите причину...",
             min_length=3,
             max_length=500,
@@ -1572,7 +1624,7 @@ class KadroModal(discord.ui.Modal):
         )
 
     # ========================================================
-    #                        SUBMIT
+    # SUBMIT
     # ========================================================
 
     async def on_submit(
@@ -1593,9 +1645,9 @@ class KadroModal(discord.ui.Modal):
 
         try:
 
-            # =================================================
-            # Сотрудник
-            # =================================================
+            # -------------------------------------------------
+            # СОТРУДНИК
+            # -------------------------------------------------
 
             employee = self.employee_select.values[0]
 
@@ -1621,9 +1673,9 @@ class KadroModal(discord.ui.Modal):
                     "для Discord-бота."
                 )
 
-            # =================================================
-            # Основные значения
-            # =================================================
+            # -------------------------------------------------
+            # ЗНАЧЕНИЯ
+            # -------------------------------------------------
 
             current_rank = (
                 self.current_rank_select.values[0]
@@ -1668,9 +1720,9 @@ class KadroModal(discord.ui.Modal):
                     self.dismiss_status_select.values[0]
                 )
 
-            # =================================================
-            # Свежая информация о сотруднике
-            # =================================================
+            # -------------------------------------------------
+            # СВЕЖИЕ ДАННЫЕ
+            # -------------------------------------------------
 
             employee = await refresh_member(
                 interaction.guild,
@@ -1678,7 +1730,7 @@ class KadroModal(discord.ui.Modal):
             )
 
             # =================================================
-            #                    ПОВЫШЕНИЕ
+            # ПОВЫШЕНИЕ
             # =================================================
 
             if self.action == "promote":
@@ -1694,43 +1746,6 @@ class KadroModal(discord.ui.Modal):
                     new_rank
                 )
 
-                remove_department = (
-                    new_rank in (
-                        "Генерал-майор полиции",
-                        "Генерал-лейтенант полиции",
-                        "Генерал-полковник полиции"
-                    )
-                )
-
-                if remove_department:
-
-                    new_rank_role_ids = {
-                        int(role_id)
-                        for role_id in RANKS[
-                            new_rank
-                        ]
-                    }
-
-                    await remove_all_department_roles(
-                        employee,
-                        preserve_role_ids=new_rank_role_ids
-                    )
-
-                    employee = await refresh_member(
-                        interaction.guild,
-                        employee
-                    )
-
-                log_reason = reason
-
-                if remove_department:
-
-                    log_reason += (
-                        "\n\n"
-                        "🏢 Все роли отдела сняты автоматически.\n"
-                        "🎖️ Роли нового звания сохранены."
-                    )
-
                 await send_log(
                     guild=interaction.guild,
                     action="📈 Повышение",
@@ -1738,7 +1753,7 @@ class KadroModal(discord.ui.Modal):
                     executor=interaction.user,
                     current_rank=current_rank,
                     new_rank=new_rank,
-                    reason=log_reason
+                    reason=reason
                 )
 
                 result = (
@@ -1747,18 +1762,12 @@ class KadroModal(discord.ui.Modal):
                     "📈 Действие: **Повышение**\n"
                     f"🎖️ Было: **{current_rank}**\n"
                     f"🎖️ Стало: **{new_rank}**\n\n"
+                    "🏢 Роли отдела сохранены.\n\n"
                     f"📝 Причина:\n{reason}"
                 )
 
-                if remove_department:
-
-                    result += (
-                        "\n\n"
-                        "🏢 Все роли отдела сняты."
-                    )
-
             # =================================================
-            #                    ПОНИЖЕНИЕ
+            # ПОНИЖЕНИЕ
             # =================================================
 
             elif self.action == "demote":
@@ -1774,42 +1783,6 @@ class KadroModal(discord.ui.Modal):
                     new_rank
                 )
 
-                remove_department = (
-                    new_rank in (
-                        "Младший сержант",
-                        "Рядовой"
-                    )
-                )
-
-                if remove_department:
-
-                    new_rank_role_ids = {
-                        int(role_id)
-                        for role_id in RANKS[
-                            new_rank
-                        ]
-                    }
-
-                    await remove_all_department_roles(
-                        employee,
-                        preserve_role_ids=new_rank_role_ids
-                    )
-
-                    employee = await refresh_member(
-                        interaction.guild,
-                        employee
-                    )
-
-                log_reason = reason
-
-                if remove_department:
-
-                    log_reason += (
-                        "\n\n"
-                        "🏢 Все роли отдела сняты автоматически.\n"
-                        "🎖️ Роли нового звания сохранены."
-                    )
-
                 await send_log(
                     guild=interaction.guild,
                     action="📉 Понижение",
@@ -1817,7 +1790,7 @@ class KadroModal(discord.ui.Modal):
                     executor=interaction.user,
                     current_rank=current_rank,
                     new_rank=new_rank,
-                    reason=log_reason
+                    reason=reason
                 )
 
                 result = (
@@ -1826,18 +1799,12 @@ class KadroModal(discord.ui.Modal):
                     "📉 Действие: **Понижение**\n"
                     f"🎖️ Было: **{current_rank}**\n"
                     f"🎖️ Стало: **{new_rank}**\n\n"
+                    "🏢 Роли отдела сохранены.\n\n"
                     f"📝 Причина:\n{reason}"
                 )
 
-                if remove_department:
-
-                    result += (
-                        "\n\n"
-                        "🏢 Все роли отдела сняты."
-                    )
-
             # =================================================
-            #                      ПЕРЕВОД
+            # ПЕРЕВОД
             # =================================================
 
             elif self.action == "transfer":
@@ -1881,7 +1848,7 @@ class KadroModal(discord.ui.Modal):
                 )
 
             # =================================================
-            #                    УВОЛЬНЕНИЕ
+            # УВОЛЬНЕНИЕ
             # =================================================
 
             elif self.action == "dismiss":
@@ -1937,9 +1904,9 @@ class KadroModal(discord.ui.Modal):
                     "Неизвестное кадровое действие."
                 )
 
-            # =================================================
-            #                  РЕЗУЛЬТАТ
-            # =================================================
+            # -------------------------------------------------
+            # ПРИВАТНЫЙ РЕЗУЛЬТАТ
+            # -------------------------------------------------
 
             await interaction.response.send_message(
                 result,
@@ -1952,9 +1919,7 @@ class KadroModal(discord.ui.Modal):
                 (
                     "❌ **Недостаточно прав**\n\n"
                     "Бот не может изменить одну или несколько ролей.\n\n"
-                    "Проверь иерархию ролей Discord.\n"
-                    "Главная роль бота должна быть выше "
-                    "всех ролей, которыми он управляет."
+                    "Проверь иерархию ролей Discord."
                 ),
                 ephemeral=True
             )
@@ -1978,19 +1943,21 @@ class KadroModal(discord.ui.Modal):
             await interaction.response.send_message(
                 (
                     "❌ **Ошибка кадрового действия**\n\n"
-                    f"```text\n"
+                    "```text\n"
                     f"{str(error)[:3500]}\n"
-                    f"```"
+                    "```"
                 ),
                 ephemeral=True
             )
 
 
 # ============================================================
-#                 КНОПКИ ПАНЕЛИ В ЧАТЕ
+# КНОПКИ ПАНЕЛИ
 # ============================================================
 
-class KadroActionButton(discord.ui.Button):
+class KadroActionButton(
+    discord.ui.Button
+):
 
     def __init__(
         self,
@@ -2033,7 +2000,9 @@ class KadroActionButton(discord.ui.Button):
         )
 
 
-class KadroPanel(discord.ui.View):
+class KadroPanel(
+    discord.ui.View
+):
 
     def __init__(self):
 
@@ -2083,7 +2052,7 @@ class KadroPanel(discord.ui.View):
 
 
 # ============================================================
-#                     /setup_kadro
+# /SETUP_KADRO
 # ============================================================
 
 @bot.tree.command(
@@ -2143,7 +2112,7 @@ async def setup_kadro(
 
 
 # ============================================================
-#                         READY
+# READY
 # ============================================================
 
 @bot.event
@@ -2213,26 +2182,12 @@ async def on_ready():
 
 
 # ============================================================
-#                           START
+# ЗАПУСК ДЛЯ ХОСТИНГА
 # ============================================================
 
 if __name__ == "__main__":
 
-    try:
-
-        bot.run(
-            TOKEN,
-            reconnect=True
-        )
-
-    except discord.LoginFailure:
-
-        print(
-            "❌ Неверный токен Discord."
-        )
-
-    except Exception as error:
-
-        print(
-            f"❌ Ошибка запуска: {error}"
-        )
+    bot.run(
+        TOKEN,
+        reconnect=True
+    )
